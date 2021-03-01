@@ -4,16 +4,19 @@
 # Created by Ashenafi Beyi
 
 ## R packages
-install.pckages("ggplot2")
-library("ggpubr")
+install.packages("ggplot2")
+install.packages("ggpubr")
 install.packages("magrittr") # package installations are only needed the first time you use it
-install.packages("dplyr")    # alternative installation of the %>%
 install.packages("FSA") # Dunn test, paired wise nonparametric test
+
+install.packages("broom")
+library(broom)
+install.packages("ggpubr")
+library("ggpubr")
 
 library(ggplot2)
 library(ggpubr)
 library(magrittr) # needs to be run every time you start R and want to use %>%
-library(dplyr)   # alternatively, this also loads %>%
 library(FSA)
 
 
@@ -25,19 +28,15 @@ str(dano_cfu_mic)
 dano_cfu_mic$TimePoint <- as.factor(dano_cfu_mic$TimePoint) # convert timpoint from
 
 ##______________ CFU ____________________________________________
-# Summary by group and time point
-cfu_summary = group_by(dano_cfu_mic,Group_Time)%>%summarize(mean=mean(log10_CipR), 
-                                            se=sd(log10_CipR)/sqrt(length(log10_CipR)))
-                                            
+
 # Kruskal Wallis test: cfu by group and sampling time point
-kruskal.test(dano_cfu_mic$log10_CipR ~ dano_cfu_mic$Group_Time)
+kruskal.test(dano_cfu_mic$log10_CipR ~ dano_cfu_mic$TimePoint)
   
   #pair wise comparion using Dun test
-dunnTest(dano_cfu_mic$log10_CipR ~ dano_cfu_mic$Group_Time, method="bh")
+dunnTest(dano_cfu_mic$log10_CipR ~ dano_cfu_mic$TimePoint, method="bh")
 
 # Line graphs
-mic_summaries <- group_by(dano_cfu_mic, Group, TimePoint) %>%
-            dplyr::summarise(
+mic_summaries <- group_by(dano_cfu_mic, Group, TimePoint) %>%summarise(
               count = n(),
               mean_cfuR = mean(log10_CipR, na.rm = TRUE),sd_cfuR = sd(log10_CipR, na.rm = TRUE),
               median_cfuR = median(log10_CipR, na.rm = TRUE), IQR_cfuR = IQR(log10_CipR, na.rm = TRUE),
@@ -57,7 +56,7 @@ ggline(mic_summaries, x="TimePoint", y= "median_cfuT", linetype = "Group",
 dano_cfu_mic_TRT <- subset(dano_cfu_mic, Treatment=="Treatment",
                         select=TimePoint:Tetracycline_BP)
 dano_cfu_mic_Control <- subset(dano_cfu_mic, Treatment=="Control",
-                            select=TimePoint:Tetracycline_B)
+                            select=TimePoint:Tetracycline_BP)
 # ..........Boxplot.....................
 par(mfrow=c(2,5))
 # Margins - Avoiding overlapping labels axes 
@@ -166,20 +165,14 @@ boxplot(dano_cfu_mic_Control$Ciprofloxacin_MIC ~ dano_cfu_mic_Control$TimePoint,
 #___________________ Correlation of MIC's among different antibiotics____________________
     # Multiple comparisons
 # https://rcompanion.org/rcompanion/f_01.html
-
-    dim(Genus4RFTrt) # 138 X 240, 228 genera (Total 298 genera in 209 samples, zero inflatted onces are removed)
-    
-    which( colnames(Genus4RFTrt)=="Proteobacteria_Campylobacterales_Campylobacteraceae_g_Campylobacter" ) # 205
-    match("Proteobacteria_g_Campylobacter", names(Genus4RFTrt)) # 205
-    colnames(Genus4RFTrt[205]) # "Campylobacter"
        
     #Pearson .....False discovery rate adjusted p-value
     empty_micTRT <- data.frame(Corr = rep(0, 11),  p_value = rep(0, 11)) # 11 is the #columns compared
-    k = c(8:18) #the MIC columns re found in columns 10 to 18
-    corr.output.micTRT <- data.frame(rep(empty_micTRT, ))
+    k = c(5:15) #the MIC columns re found in columns 5 to 15
+    corr.pear.micTRT <- data.frame(rep(empty_micTRT, ))
     for(i in k){
-      cor.assoc <- cor.test(dano_cfu_mic_TRT[8:18], dano_cfu_mic_TRT[8:18, i], type="pearson")
-      corr.output.micTRT[i,] <- cbind(corr=cor.assoc$estimate,  p_value=cor.assoc$p.value)
+      cor.assoc <- cor.test(dano_cfu_mic_TRT[5:15,11], dano_cfu_mic_TRT[5:15, i], type="pearson")
+      corr.pear.micTRT[i,] <- cbind(corr=cor.assoc$estimate,  p_value=cor.assoc$p.value)
     }
     corr.pear.micTRT
     corr.pear.micTRT$FDR = p.adjust(corr.pear.micTRT$p_value, method = "fdr") # False discovery rate adjusted p-value
@@ -188,7 +181,7 @@ boxplot(dano_cfu_mic_Control$Ciprofloxacin_MIC ~ dano_cfu_mic_Control$TimePoint,
     # Spearman.........False discovery rate adjusted p-value
     corr.spear.micTRT <- data.frame(rep(empty_micTRT, ))
     for(i in k){
-      cor.assoc <- cor.test(dano_cfu_mic_TRT[8:18], dano_cfu_mic_TRT[8:18, i], type="spearman")
+      cor.assoc <- cor.test(dano_cfu_mic_TRT[5:15, 11], dano_cfu_mic_TRT[5:15, i], type="spearman")
       corr.output.micTRT[i,] <- cbind(corr=cor.assoc$estimate,  p_value=cor.assoc$p.value)
      }
     corr.spear.micTRT
@@ -202,17 +195,11 @@ boxplot(dano_cfu_mic_Control$Ciprofloxacin_MIC ~ dano_cfu_mic_Control$TimePoint,
     #EXPORT FILE
     install.packages("rio")
     library("rio")
-    export(CorrAdj.genusTrt, file="C:/Data analysis/DanofloxacinData/Debora/Corr.micTRT.xlsx")
+    export(CorrAdj.micTRT, file="C:/Data analysis/Debora/Corr.micTRT.xlsx")
     
     cor.test(corr.pear.micTRT$Corr, corr.spear.micTRT$Corr) # 1, Pearson and Pearson correlation values has 1.0 correlation cofficient
     
+    
+    chi-square
 
 
-# Repeated measure correlation 
-install.packages("rmcorr")
-library(rmcorr)
-
-mic_rmcorr <- rmcorr(TimePoint, Ciprofloxacin_MIC, Clindamycin_MIC,Erythromicin_MIC, 
-Florfenicol_MIC, Gentamicin_MIC, Nalidixic.acid_MIC, Telithromycin_MIC,Tetracycline_MIC,
-dano_cfu_mic, CIs = c("analytic,", "bootsrap"), nreps = 100, 
-bstrap.out = F)
